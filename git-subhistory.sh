@@ -106,7 +106,7 @@ get_path_to_sub () {
 commit_filter='git commit-tree "$@"' # default/noop
 
 subhistory_split () {
-	test $# = 1 || usage "wrong number of arguments to 'split'"
+	test $# \> 0 || usage "wrong number of arguments to 'split'"
 	get_path_to_sub "$1"
 
 	elaborate "'split' path_to_sub='$path_to_sub' newbranch='$newbranch'" \
@@ -123,6 +123,27 @@ subhistory_split () {
 		git update-ref --no-deref SPLIT_HEAD HEAD || exit $?
 		elaborate "Set detached SPLIT_HEAD"
 	fi
+
+  MAPPING_FILE="$GIT_DIR/subhistory-tmp/mapping"
+
+  if [ -n "$2" ]
+  then
+    git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
+
+    # create mapping between signed an unsigned commits from subproject
+    git filter-branch \
+      --original subhistory-tmp/filter-branch-backup \
+      --commit-filter "printf \"\${GIT_COMMIT},\" >> ${MAPPING_FILE}; git commit-tree \"\$@\" | tee -a ${MAPPING_FILE}" \
+      -- SUBPROJ_HEAD  \
+	2>&1 | say_stdin || exit $?
+
+    # choose signed commit from subproject if available
+    commit_filter=$(echo "COMMIT=\"\$(git commit-tree \"\$@\")\"" \
+                "MAPPING=\$(grep \",\${COMMIT}\" \"${MAPPING_FILE}\");" \
+                "REPLACEMENT=\"\${MAPPING%,*}\";" \
+                "if [ -n \"\${REPLACEMENT}\" ]; then echo \"\${REPLACEMENT}\";" \
+                "else echo \"\${COMMIT}\"; fi")
+  fi
 
 	git filter-branch \
 		--original subhistory-tmp/filter-branch-backup \
@@ -348,7 +369,7 @@ GIT_PREFIX="$(git rev-parse --show-prefix)"
 cd ./$(git rev-parse --show-cdup) || exit $?
 
 # the path to the .git directory (or directory to use as such)
-GIT_DIR="$(git rev-parse --git-dir)"
+GIT_DIR="$(cd $(git rev-parse --git-dir) && pwd)"
 
 # a temporary directory for e.g. filter-branch backups
 mkdir "$GIT_DIR/subhistory-tmp/" || exit $?
