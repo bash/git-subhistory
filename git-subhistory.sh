@@ -21,7 +21,7 @@ git-subhistory merge <subproj-path> <subproj-branch>
 q,quiet         be quiet
 v,verbose       be verbose
 h               show the help
-S,sign			sign commits
+S,sign          sign commits
 
  options for 'split':
 b=              create a new branch for the split-out commit history
