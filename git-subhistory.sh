@@ -36,6 +36,11 @@ newbranch=
 force_newbranch=
 sign=
 
+if [ "$(git config --bool commit.gpgsign)" = "true" ]
+then
+	sign=1
+fi
+
 while test $# != 0
 do
 	case "$1" in
@@ -108,16 +113,6 @@ get_path_to_sub () {
 # TODO: find a better place to put this
 commit_filter='git commit-tree "$@"' # default/noop
 
-sign_filter=""
-
-if test "$sign"; then
-	sign_filter='
-		if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ]; then
-			commit_command="git commit-tree -S$(git config --get user.signingkey) $@"
-		fi
-	'
-fi
-
 subhistory_split () {
 	test $# \> 0 || usage "wrong number of arguments to 'split'"
 	get_path_to_sub "$1"
@@ -139,7 +134,8 @@ subhistory_split () {
 
 	if [ -n "$2" ]
 	then
-		MAPPING_DIR="$GIT_DIR/subhistory-tmp/signed-commit-map"
+		export MAPPING_DIR="$GIT_DIR/subhistory-tmp/signed-commit-map"
+		export SIGN_COMMITS="$sign"
 		mkdir -p "${MAPPING_DIR}"
 
 		git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
@@ -152,12 +148,24 @@ subhistory_split () {
 		2>&1 | say_stdin || exit $?
 
 		# choose signed commit from subproject if available
-		commit_filter=$(echo "commit_command=\"git commit-tree \$@\"" \
-						"$sign_filter" \
-						"COMMIT=\"\$(git commit-tree \"\$@\")\";" \
-						"REPLACEMENT=\$(cat \"${MAPPING_DIR}/\${COMMIT}\" 2> /dev/null);" \
-						"if [ -n \"\${REPLACEMENT}\" ]; then echo \"\${REPLACEMENT}\";" \
-						"else echo \"\$(\$commit_command)\"; fi")
+		commit_filter='
+			COMMIT=$(git commit-tree $@)
+			REPLACEMENT=$(cat "${MAPPING_DIR}/${COMMIT}" 2> /dev/null);
+
+			if [ -n "${REPLACEMENT}" ]
+			then
+				echo "${REPLACEMENT}" > /dev/stderr
+				echo "${REPLACEMENT}"
+			else
+				if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
+					git commit-tree -S$(git config --get user.signingkey) "$@"
+					echo "creating new signed commit" > /dev/stderr
+				else
+					echo "creating new commit" > /dev/stderr
+					git commit-tree "$@"
+				fi
+			fi
+		'
 	fi
 
 	git filter-branch \
@@ -196,11 +204,10 @@ subhistory_assimilate () {
 	then
 		# split HEAD
 		mkdir "$GIT_DIR/subhistory-tmp/split-to-orig-map" || exit $?
-		commit_filter=$(echo "commit_command=\"git commit-tree \$@\"" \
-						"$sign_filter" \
-						"rewritten=\$(git commit-tree \"\$@\") &&" \
-						"echo \$GIT_COMMIT > \"\$GIT_DIR/subhistory-tmp/split-to-orig-map/\$rewritten\" &&" \
-						"echo \$rewritten")
+		commit_filter='
+			rewritten=$(git commit-tree "$@") &&
+			echo $GIT_COMMIT > "$GIT_DIR/subhistory-tmp/split-to-orig-map/$rewritten" &&
+			echo $rewritten'
 		subhistory_split "$1" || exit $?
 		say # blank line after summary of subhistory_split
 
