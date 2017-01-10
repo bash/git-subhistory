@@ -157,7 +157,8 @@ subhistory_split () {
 
 		# choose signed commit from subproject if available
 		commit_filter='
-			COMMIT=$(git commit-tree $@)
+			MSG=$(cat)
+			COMMIT=$(printf "$MSG\n" | git commit-tree "${@}")
 			REPLACEMENT=$(cat "${MAPPING_DIR}/${COMMIT}" 2> /dev/null);
 
 			if [ -n "${REPLACEMENT}" ]
@@ -165,10 +166,10 @@ subhistory_split () {
 				echo "${REPLACEMENT}"
 			else
 				if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
-					args=("-S$(git config --get user.signingkey)", "$@")
-					git commit-tree "$args"
+					args=("-S$(git config --get user.signingkey)" "$@")
+					printf "$MSG\n" | git commit-tree "${args[@]}"
 				else
-					git commit-tree "$@"
+					printf "$MSG\n" | git commit-tree "$@"
 				fi
 			fi
 		'
