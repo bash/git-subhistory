@@ -21,6 +21,7 @@ git-subhistory merge <subproj-path> <subproj-branch>
 q,quiet         be quiet
 v,verbose       be verbose
 h               show the help
+S,sign			sign commits
 
  options for 'split':
 b=              create a new branch for the split-out commit history
@@ -33,6 +34,7 @@ quiet="$GIT_QUIET"
 verbose=
 newbranch=
 force_newbranch=
+sign=
 
 while test $# != 0
 do
@@ -41,6 +43,7 @@ do
 	--no-quiet) quiet= ;;
 	-v|--verbose) verbose=1 ;;
 	--no-verbose) verbose= ;;
+	-S|--sign) sign=1 ;;
 	-b|-B)
 		test "$1" = "-B" && force_newbranch=-f
 		shift
@@ -105,6 +108,16 @@ get_path_to_sub () {
 # TODO: find a better place to put this
 commit_filter='git commit-tree "$@"' # default/noop
 
+sign_filter=""
+
+if test "$sign"; then
+	sign_filter='
+		if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ]; then
+			commit_command="git commit-tree -S$(git config --get user.signingkey) $@"
+		fi
+	'
+fi
+
 subhistory_split () {
 	test $# \> 0 || usage "wrong number of arguments to 'split'"
 	get_path_to_sub "$1"
@@ -139,10 +152,12 @@ subhistory_split () {
 		2>&1 | say_stdin || exit $?
 
 		# choose signed commit from subproject if available
-		commit_filter=$(echo "COMMIT=\"\$(git commit-tree \"\$@\")\";" \
+		commit_filter=$(echo "commit_command=\"git commit-tree \$@\"" \
+						"$sign_filter" \
+						"COMMIT=\"\$(git commit-tree \"\$@\")\";" \
 						"REPLACEMENT=\$(cat \"${MAPPING_DIR}/\${COMMIT}\" 2> /dev/null);" \
 						"if [ -n \"\${REPLACEMENT}\" ]; then echo \"\${REPLACEMENT}\";" \
-						"else echo \"\${COMMIT}\"; fi")
+						"else echo \"\$(\$commit_command)\"; fi")
 	fi
 
 	git filter-branch \
@@ -181,10 +196,11 @@ subhistory_assimilate () {
 	then
 		# split HEAD
 		mkdir "$GIT_DIR/subhistory-tmp/split-to-orig-map" || exit $?
-		commit_filter='
-			rewritten=$(git commit-tree "$@") &&
-			echo $GIT_COMMIT > "$GIT_DIR/subhistory-tmp/split-to-orig-map/$rewritten" &&
-			echo $rewritten'
+		commit_filter=$(echo "commit_command=\"git commit-tree \$@\"" \
+						"$sign_filter" \
+						"rewritten=\$(git commit-tree \"\$@\") &&" \
+						"echo \$GIT_COMMIT > \"\$GIT_DIR/subhistory-tmp/split-to-orig-map/\$rewritten\" &&" \
+						"echo \$rewritten")
 		subhistory_split "$1" || exit $?
 		say # blank line after summary of subhistory_split
 
