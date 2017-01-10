@@ -154,14 +154,11 @@ subhistory_split () {
 
 			if [ -n "${REPLACEMENT}" ]
 			then
-				echo "${REPLACEMENT}" > /dev/stderr
 				echo "${REPLACEMENT}"
 			else
 				if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
 					git commit-tree -S$(git config --get user.signingkey) "$@"
-					echo "creating new signed commit" > /dev/stderr
 				else
-					echo "creating new commit" > /dev/stderr
 					git commit-tree "$@"
 				fi
 			fi
