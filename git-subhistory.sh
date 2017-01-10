@@ -111,7 +111,14 @@ get_path_to_sub () {
 # Subcommands
 
 # TODO: find a better place to put this
-commit_filter='git commit-tree "$@"' # default/noop
+commit_filter='
+	if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
+		args=("-S$(git config --get user.signingkey)" "$@")
+		git commit-tree "${args[@]}"
+	else
+		git commit-tree "$@"
+	fi
+' # default/noop
 
 subhistory_split () {
 	test $# \> 0 || usage "wrong number of arguments to 'split'"
@@ -132,10 +139,11 @@ subhistory_split () {
 		elaborate "Set detached SPLIT_HEAD"
 	fi
 
+	export SIGN_COMMITS="$sign"
+
 	if [ -n "$2" ]
 	then
 		export MAPPING_DIR="$GIT_DIR/subhistory-tmp/signed-commit-map"
-		export SIGN_COMMITS="$sign"
 		mkdir -p "${MAPPING_DIR}"
 
 		git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
@@ -157,7 +165,8 @@ subhistory_split () {
 				echo "${REPLACEMENT}"
 			else
 				if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
-					git commit-tree -S$(git config --get user.signingkey) "$@"
+					args=("-S$(git config --get user.signingkey)", "$@")
+					git commit-tree "$args"
 				else
 					git commit-tree "$@"
 				fi
