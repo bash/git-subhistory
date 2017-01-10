@@ -124,26 +124,26 @@ subhistory_split () {
 		elaborate "Set detached SPLIT_HEAD"
 	fi
 
-  if [ -n "$2" ]
-  then
-    MAPPING_DIR="$GIT_DIR/subhistory-tmp/signed-commit-map"
-    mkdir -p "${MAPPING_DIR}"
+	if [ -n "$2" ]
+	then
+		MAPPING_DIR="$GIT_DIR/subhistory-tmp/signed-commit-map"
+		mkdir -p "${MAPPING_DIR}"
 
-    git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
+		git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
 
-    # create mapping between signed an unsigned commits from subproject
-    git filter-branch \
-      --original subhistory-tmp/filter-branch-backup \
-      --commit-filter "COMMIT=\"\$(git commit-tree \"\$@\")\"; echo \"\${GIT_COMMIT}\" | tee ${MAPPING_DIR}/\${COMMIT}" \
-      -- SUBPROJ_HEAD  \
-	  2>&1 | say_stdin || exit $?
+		# create mapping between signed an unsigned commits from subproject
+		git filter-branch \
+			--original subhistory-tmp/filter-branch-backup \
+			--commit-filter "COMMIT=\"\$(git commit-tree \"\$@\")\"; echo \"\${GIT_COMMIT}\" | tee ${MAPPING_DIR}/\${COMMIT}" \
+			-- SUBPROJ_HEAD	\
+		2>&1 | say_stdin || exit $?
 
-    # choose signed commit from subproject if available
-    commit_filter=$(echo "COMMIT=\"\$(git commit-tree \"\$@\")\";" \
-                  "REPLACEMENT=\$(cat \"${MAPPING_DIR}/\${COMMIT}\" 2> /dev/null);" \
-                  "if [ -n \"\${REPLACEMENT}\" ]; then echo \"\${REPLACEMENT}\";" \
-                  "else echo \"\${COMMIT}\"; fi")
-  fi
+		# choose signed commit from subproject if available
+		commit_filter=$(echo "COMMIT=\"\$(git commit-tree \"\$@\")\";" \
+						"REPLACEMENT=\$(cat \"${MAPPING_DIR}/\${COMMIT}\" 2> /dev/null);" \
+						"if [ -n \"\${REPLACEMENT}\" ]; then echo \"\${REPLACEMENT}\";" \
+						"else echo \"\${COMMIT}\"; fi")
+	fi
 
 	git filter-branch \
 		--original subhistory-tmp/filter-branch-backup \
