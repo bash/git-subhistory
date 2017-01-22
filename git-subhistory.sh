@@ -110,7 +110,7 @@ get_path_to_sub () {
 ##############
 # Subcommands
 
-# TODO: find a better place to put this
+# signs commits by the current user if -S is passed or 'commit.gpgsign' is set to true
 commit_filter='
 	if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
 		args=("-S$(git config --get user.signingkey)" "$@")
@@ -148,14 +148,17 @@ subhistory_split () {
 
 		git update-ref --no-deref SUBPROJ_HEAD $2 || exit $?
 
-		# create mapping between signed an unsigned commits from subproject
+		# this creates a mapping between synthetic commits and commits from the subproject
 		git filter-branch \
 			--original subhistory-tmp/filter-branch-backup \
 			--commit-filter "COMMIT=\"\$(git commit-tree \"\$@\")\"; echo \"\${GIT_COMMIT}\" | tee ${MAPPING_DIR}/\${COMMIT}" \
 			-- SUBPROJ_HEAD	\
 		2>&1 | say_stdin || exit $?
 
-		# choose signed commit from subproject if available
+		# this filter checks if the commit that we're trying to create already exists in the subproject.
+		# if this is the case it uses the subproject's commit, which might be signed.
+		# doing this also prevents us from later signing commits that already exist in the subproject causing differing commit ids.
+		# if -S is passed or 'commit.gpgsign' is set to true, we sign new commits by the current user.
 		commit_filter='
 			MSG=$(cat)
 			COMMIT=$(printf "$MSG\n" | git commit-tree "${@}")
