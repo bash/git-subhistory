@@ -15,7 +15,7 @@ die () {
 test $# = 0 && set -- -h
 
 OPTS_SPEC="\
-git-subhistory split <subproj-path> (-b | -B) <subproj-branch>
+git-subhistory split <subproj-path> (-b | -B) [<subproj-branch>] [<subproj-remote>]
 git-subhistory merge <subproj-path> <subproj-branch>
 --
 q,quiet         be quiet
