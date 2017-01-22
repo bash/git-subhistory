@@ -36,7 +36,7 @@ newbranch=
 force_newbranch=
 sign=
 
-if [ "$(git config --bool commit.gpgsign)" = "true" ]
+if [ "$(git config --bool subhistory.gpgsign)" = "true" ]
 then
 	sign=1
 fi
@@ -110,7 +110,7 @@ get_path_to_sub () {
 ##############
 # Subcommands
 
-# signs commits by the current user if -S is passed or 'commit.gpgsign' is set to true
+# signs commits by the current user if -S is passed or 'subhistory.gpgsign' is set to true
 commit_filter='
 	if [ "${GIT_COMMITTER_EMAIL}" = "$(git config --get user.email)" ] && test "$SIGN_COMMITS"; then
 		args=("-S$(git config --get user.signingkey)" "$@")
@@ -158,7 +158,7 @@ subhistory_split () {
 		# this filter checks if the commit that we're trying to create already exists in the subproject.
 		# if this is the case it uses the subproject's commit, which might be signed.
 		# doing this also prevents us from later signing commits that already exist in the subproject causing differing commit ids.
-		# if -S is passed or 'commit.gpgsign' is set to true, we sign new commits by the current user.
+		# if -S is passed or 'subhistory.gpgsign' is set to true, we sign new commits by the current user.
 		commit_filter='
 			MSG=$(cat)
 			COMMIT=$(printf "$MSG\n" | git commit-tree "${@}")
